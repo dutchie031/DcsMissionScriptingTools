@@ -1,0 +1,8 @@
+{
+  "name": "dcs-mission-scripting-tools",
+  "private": true,
+  "workspaces": [
+    "compiler",
+    "dutchies-dcs-scripting-tools"
+  ]
+}

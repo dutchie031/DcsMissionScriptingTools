@@ -1,0 +1,89 @@
+{
+  "name": "dutchies-dcs-scripting-tools",
+  "displayName": "Dutchies Dcs Scripting Tools",
+  "description": "Scripting tools to create DCS script and frameworks easier",
+  "version": "0.0.1",
+  "author": {
+    "name": "dutchie031",
+    "email": "54616262+dutchie031@users.noreply.github.com"
+  },
+  "publisher": "dutchie031",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.108.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dutchie031/DcsMissionScriptingTools"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "grammars": [
+      {
+        "path": "./syntaxes/lua-slocal.json",
+        "scopeName": "source.lua.slocal",
+        "injectTo": ["source.lua"]
+      }
+    ],
+    "commands": [
+      {
+        "command": "dutchies-dcs-scripting-tools.enable",
+        "title": "Enable",
+        "category": "Dutchies DCS Tools"
+      },
+      {
+        "command": "dutchies-dcs-scripting-tools.disable",
+        "title": "Disable",
+        "category": "Dutchies DCS Tools"
+      },
+      {
+        "command": "dutchies-dcs-scripting-tools.compileLuaScripts",
+        "title": "Compile",
+        "category": "Dutchies DCS Tools"
+      }
+    ]
+  },
+  "extensionDependencies": [
+    "sumneko.lua"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "lua-addons/**/*",
+    "syntaxes/**/*"
+  ],
+  "dependencies": {
+    "dcs-script-compiler" : "*"
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build -w compiler && npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "watch:compiler": "cd ../compiler && npm run watch",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.108.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.52.0",
+    "eslint": "^9.39.2",
+    "esbuild": "^0.27.2",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
