@@ -57,7 +57,7 @@ export class ScriptCompiler {
     }
 
     private parseFile(filePath: string, content: string, fullPath: string): ParsedFile {
-        const dependencies: string[] = [];
+        const dependencies: Dependency[] = [];
         const newLines: string[] = [`do --${filePath}`];
 
         content = stripLuaMultilineComments(content);
@@ -113,7 +113,7 @@ export class ScriptCompiler {
             const requireMatch = line.match(/require\(['"](.+?)['"]\)/);
             if (requireMatch) {
                 const requiredModule = fileReferenceToLuaVariable(requireMatch[1]);
-                dependencies.push(requiredModule);
+                dependencies.push(new Dependency(requiredModule, fullPath, i + 1));
                 line = line.replace(requireMatch[0], requiredModule);
             }
 
@@ -241,6 +241,15 @@ function stripLuaMultilineComments(content: string): string {
     return content.replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, '');
 }
 
+class Dependency {
+    
+    constructor(
+        public readonly name: string,
+        public readonly filePath: string,
+        public readonly requiredAtLine: number
+    ){}
+}
+
 class ParsedFile {
     public readonly fileKey: string;
     
@@ -248,7 +257,7 @@ class ParsedFile {
         public readonly filePath: string,
         public readonly fullPath: string,
         public readonly lines: string[],
-        public readonly dependencies: string[]
+        public readonly dependencies: Dependency[]
     ) {
         this.fileKey = fileReferenceToLuaVariable(filePath);
     }
@@ -302,23 +311,24 @@ class Writer {
 
         outputLines.push(...this.getStartLines());
 
-        const writeFileRecursive = (fileKey: string) => {
-            if (writtenFiles.has(fileKey)) {
-                return;
-            }
+        const writeFileRecursive = (parsedFile: ParsedFile) => {
             
-            const file = this.files.get(fileKey);
-            if (!file) {
-                throw new Error(`File not found in compiler: ${fileKey}`);
-            }
-
             // Write dependencies first
-            for (const dep of file.dependencies) {
-                writeFileRecursive(dep);
+            for (const dep of parsedFile.dependencies) {
+                const depFile = this.files.get(dep.name);
+                if (depFile) {
+                    writeFileRecursive(depFile);
+                } else {
+                    this.onError?.({
+                        filePath: parsedFile.fullPath,
+                        line: 0,
+                        message: `Missing dependency: ${dep}`
+                    });
+                }
             }
             
-            outputLines.push(...file.lines);
-            writtenFiles.add(fileKey);
+            outputLines.push(...parsedFile.lines);
+            writtenFiles.add(parsedFile.fileKey);
         };
 
         //Check for circular dependencies before writing
@@ -347,7 +357,7 @@ class Writer {
                 const file = this.files.get(key);
                 if (file) {
                     for (const dep of file.dependencies) {
-                        if (checkCircular(dep)) {
+                        if (checkCircular(dep.name)) {
                             return true;
                         }
                     }
@@ -362,8 +372,8 @@ class Writer {
         }   
 
         // Write all files in dependency order
-        for (const fileKey of this.files.keys()) {
-            writeFileRecursive(fileKey);
+        for (const parsedFile of this.files.values()) {
+            writeFileRecursive(parsedFile);
         }
 
         fs.mkdirSync(path.dirname(this.location), { recursive: true });
