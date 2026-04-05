@@ -22,6 +22,17 @@
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Dutchies DCS Scripting Tools Settings",
+      "properties": {
+        "dutchiesDcsScriptingTools.compileAt" : {
+          "type": "string",
+          "enum": ["onSave", "onCompileCommand"],
+          "default": "onCompileCommand",
+          "description": "When to compile the Lua scripts"
+        }
+      }
+    },
     "grammars": [
       {
         "path": "./syntaxes/lua-slocal.json",
@@ -56,9 +67,7 @@
     "lua-addons/**/*",
     "syntaxes/**/*"
   ],
-  "dependencies": {
-    "dcs-script-compiler" : "*"
-  },
+  "dependencies": {},
   "scripts": {
     "vscode:prepublish": "npm run build -w compiler && npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",

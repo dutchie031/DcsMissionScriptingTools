@@ -4,5 +4,8 @@
   "workspaces": [
     "compiler",
     "dutchies-dcs-scripting-tools"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "^25.5.2"
+  }
 }
