@@ -1,7 +1,8 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { ScriptCompiler, ScriptCompilerOptions, CompilationError } from 'dcs-script-compiler';
+import { ScriptCompiler, ScriptCompilerOptions, CompilationError, ICompilationLogger } from 'dcs-script-compiler';
+import { Logger } from './logger';
 
 const luaWorkSpaceSettingKey = "Lua.workspace";
 const librarySettingsKey = "library";
@@ -9,6 +10,7 @@ const diagnosticCollection = vscode.languages.createDiagnosticCollection('lua-tr
 
 let pluginPath : string | undefined;
 
+const logger = new Logger();
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -36,18 +38,34 @@ export function activate(context: vscode.ExtensionContext) {
             const start = Date.now();
             await compileLuaScripts();
             const end = Date.now();
-            console.log(`Lua scripts compiled in ${(end - start) / 1000} seconds.`);
             vscode.window.showInformationMessage(`Lua scripts compiled successfully in ${(end - start) / 1000} seconds.`);
         }catch(err){ 
             vscode.window.showErrorMessage('Error compiling Lua scripts: ' + (err as Error).message);
         }
     });
+
 }
 
 // This method is called when your extension is deactivated
 export function deactivate() 
 {
     removePluginPathFromSettings();
+}
+
+class CompilationLogger implements ICompilationLogger {
+
+    constructor(
+        private readonly logger: Logger) {
+    }
+    info(message: string): void {
+        this.logger.info(message);
+    }
+    error(message: string): void {
+        this.logger.error(message);
+    }
+    writeLine(message: string): void {
+        this.logger.log(message);
+    }
 }
 
 async function compileLuaScripts() {
@@ -74,7 +92,8 @@ async function compileLuaScripts() {
         }
     };
 
-    const compiler = new ScriptCompiler(options);
+    const compilationLogger = new CompilationLogger(logger);
+    const compiler = new ScriptCompiler(options, compilationLogger);
     try {
         await compiler.compile();
     } catch (err) {
@@ -86,7 +105,7 @@ async function compileLuaScripts() {
     for (const [filePath, errors] of errorsByFile) {
         const uri = vscode.Uri.file(filePath);
         const diagnostics = errors.map(error => {
-            const range = new vscode.Range(error.line, 0, error.line, 0);
+            const range = new vscode.Range(error.line, error.charStart ?? 0, error.line, error.charEnd ?? 0);
             const diagnostic = new vscode.Diagnostic(range, error.message, vscode.DiagnosticSeverity.Error);
             diagnostic.source = 'DCS Lua Transpiler';
             return diagnostic;
