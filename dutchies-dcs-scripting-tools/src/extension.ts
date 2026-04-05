@@ -12,9 +12,13 @@ let pluginPath : string | undefined;
 
 const logger = new Logger();
 
+const extensionName = 'dutchies-dcs-scripting-tools';
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+
+    
 	pluginPath = context.asAbsolutePath('lua-addons');
    
     vscode.commands.registerCommand('dutchies-dcs-scripting-tools.enable', () => {
@@ -43,7 +47,6 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showErrorMessage('Error compiling Lua scripts: ' + (err as Error).message);
         }
     });
-
 }
 
 // This method is called when your extension is deactivated
