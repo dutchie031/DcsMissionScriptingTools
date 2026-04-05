@@ -25,7 +25,7 @@
     "configuration": {
       "title": "Dutchies DCS Scripting Tools Settings",
       "properties": {
-        "dutchiesDcsScriptingTools.compileAt" : {
+        "dutchies-dcs-scripting-tools.compileAt" : {
           "type": "string",
           "enum": ["onSave", "onCompileCommand"],
           "default": "onCompileCommand",
