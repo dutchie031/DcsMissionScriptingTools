@@ -20,6 +20,10 @@ export class Logger {
         this.outputChannel.appendLine(`[${new Date().toISOString()}][ERROR] ${message}`);
     }
 
+    clear() {
+        this.outputChannel.clear();
+    }
+
     dispose() {
         this.outputChannel.dispose();
     }

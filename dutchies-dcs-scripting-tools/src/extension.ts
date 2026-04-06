@@ -13,46 +13,75 @@ let pluginPath : string | undefined;
 const logger = new Logger();
 
 const extensionName = 'dutchies-dcs-scripting-tools';
+const publisherName = 'dutchie031';
+const extensionSettingsFilter = `@ext:${publisherName}.${extensionName}`;
+
+//TODO: 
+// - ENABLE/DISABLE with settings instead of commands (or both)
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
-    
 	pluginPath = context.asAbsolutePath('lua-addons');
-   
-    vscode.commands.registerCommand('dutchies-dcs-scripting-tools.enable', () => {
-        addPluginPathToSettings();
-        vscode.commands.executeCommand(
-            "lua.startServer"
-        );
-        vscode.window.showInformationMessage('Dutchies DCS Scripting Tools enabled.');
-    });
 
-    vscode.commands.registerCommand('dutchies-dcs-scripting-tools.disable', () => {
-        removePluginPathFromSettings();
-        vscode.commands.executeCommand(
-            "lua.startServer"
-        );
-        vscode.window.showInformationMessage('Dutchies DCS Scripting Tools disabled.');
-    });
+    context.subscriptions.push(
+        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.enable', () => {
+            addPluginPathToSettings();
+            vscode.commands.executeCommand(
+                "lua.startServer"
+            );
+            vscode.window.showInformationMessage('Dutchies DCS Scripting Tools enabled.');
+        })
+    );
 
-    vscode.commands.registerCommand('dutchies-dcs-scripting-tools.compileLuaScripts', async () => {
-        try{
-            const start = Date.now();
-            await compileLuaScripts();
-            const end = Date.now();
-            vscode.window.showInformationMessage(`Lua scripts compiled successfully in ${(end - start) / 1000} seconds.`);
-        }catch(err){ 
-            vscode.window.showErrorMessage('Error compiling Lua scripts: ' + (err as Error).message);
+    context.subscriptions.push(
+        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.disable', () => {
+            removePluginPathFromSettings();
+            vscode.commands.executeCommand(
+                "lua.startServer"
+            );
+            vscode.window.showInformationMessage('Dutchies DCS Scripting Tools disabled.');
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.openSettings', () => {
+            vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${extensionSettingsFilter}`);
+    }));
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.compileLuaScripts', async () => {
+            try{
+                const start = Date.now();
+                await compileLuaScripts();
+                const end = Date.now();
+                vscode.window.showInformationMessage(`Lua scripts compiled successfully in ${(end - start) / 1000} seconds.`);
+            }catch(err){ 
+                vscode.window.showErrorMessage('Error compiling Lua scripts: ' + (err as Error).message);
+            }
+        })
+    );
+
+    vscode.workspace.onDidSaveTextDocument(async(document) => {
+        logger.info(`Document saved: ${document.uri.fsPath} | Language: ${document.languageId}`);
+        if (document.languageId === 'lua') {
+            const config = vscode.workspace.getConfiguration(extensionName);
+            const compileAt = config.get<string>('compileAt') || "undefined";
+            if (compileAt === 'onSave') {
+                await compileLuaScripts();
+            }
         }
     });
+
+    logger.info('Dutchies DCS Scripting Tools extension activated');
 }
 
 // This method is called when your extension is deactivated
 export function deactivate() 
 {
     removePluginPathFromSettings();
+    logger.info('Dutchies DCS Scripting Tools extension deactivated');
 }
 
 class CompilationLogger implements ICompilationLogger {
@@ -72,6 +101,8 @@ class CompilationLogger implements ICompilationLogger {
 }
 
 async function compileLuaScripts() {
+    logger.clear();
+    logger.info("Compiling...");
 
     const config = vscode.workspace.getConfiguration('dcsScriptingTools');
     const sourcePath = config.get<string>('luaSourcePath') || '${workspaceFolder}/src';
