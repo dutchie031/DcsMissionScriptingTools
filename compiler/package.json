@@ -1,0 +1,13 @@
+{
+    "name": "dcs-mission-scripting-tools-compiler",
+    "devDependencies": {
+        "@types/node": "25.5.2"
+    },
+    "scripts": {
+        "build": "tsc -p . --outDir dist",
+        "watch": "tsc -p . --outDir dist --watch"
+    },
+    "files": [
+        "dist/**/*"
+    ]
+}

@@ -64,6 +64,8 @@ export class ScriptCompiler {
         const readStart = Date.now();
         for (const entry of entries) {
             if (entry.isFile() && entry.name.endsWith('.lua')) {
+                
+
                 const fullPath = path.join(entry.parentPath ?? entry.path, entry.name);
                 const relativePath = path.relative(this.options.sourcePath, fullPath);
                 const content = fs.readFileSync(fullPath, 'utf-8');
