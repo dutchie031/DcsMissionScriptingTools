@@ -1,5 +1,4 @@
 import * as core from '@actions/core';
-import { execSync } from 'child_process';
 import { ScriptCompiler, ScriptCompilerOptions, CompilationError, ICompilationLogger } from 'dcs-script-compiler';
 
 class Logger implements ICompilationLogger {
@@ -15,7 +14,6 @@ class Logger implements ICompilationLogger {
         core.info(message);
     }
 }
-
 
 async function run() {
     try {

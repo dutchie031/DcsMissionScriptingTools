@@ -11,5 +11,12 @@ inputs:
     default: 'output/compiled.lua'
   
 runs:
-  using: 'node20'
-  main: 'dist/index.js'
+  using: 'composite'
+  steps:
+    - run: |
+        cd ${{ github.action_path }}
+        npm ci
+        npm run build
+        node dist/index.js
+      shell: bash
+    
