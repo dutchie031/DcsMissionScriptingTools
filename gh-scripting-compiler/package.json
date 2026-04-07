@@ -1,0 +1,18 @@
+{
+  "name": "gh-scripting-compiler",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "node esbuild.js --production"
+  },
+  "dependencies": {
+    "@actions/core": "^1.10.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0",
+    "esbuild": "^0.27.2"
+  }
+}

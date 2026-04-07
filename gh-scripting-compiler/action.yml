@@ -1,0 +1,15 @@
+name: 'Scripting Compiler Action'
+description: 'Runs the custom ScriptCompiler as a GitHub Action.'
+inputs:
+  source-root:
+    description: 'The root directory of the source files to compile.'
+    required: true
+    default: 'src'
+  output-file:
+    description: 'The path to the output file for the compiled script.'
+    required: true
+    default: 'output/compiled.lua'
+  
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
