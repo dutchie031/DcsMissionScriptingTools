@@ -49,8 +49,17 @@
           "type": "boolean",
           "default": false,
           "description": "Adds an additional script. This can be referenced from DCS through doScriptFile. This will then execute the compiles script. This way you don't have to reinsert the script on each change, but can just hit 'restart'."
-        }
-        
+        },
+        "dutchies-dcs-scripting-tools.luaSrcDirectory" : {
+          "type":"string",
+          "default": "${workspaceFolder}/src",
+          "description": "Where the source files start. default: ${workspaceFolder}/src"
+        },
+        "dutchies-dcs-scripting-tools.luaOutputPath" : {
+          "type":"string",
+          "default": "${workspaceFolder}/dist",
+          "description": "Where the compiled Lua files will be output. default: ${workspaceFolder}/dist"
+        }        
       }
     },
     "grammars": [
