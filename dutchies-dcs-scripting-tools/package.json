@@ -7,6 +7,11 @@
     "name": "dutchie031",
     "email": "54616262+dutchie031@users.noreply.github.com"
   },
+  "icon": "dutchie2.png",
+  "galleryBanner": {
+    "color": "#222430",
+    "theme": "dark"
+  },
   "publisher": "dutchie031",
   "license": "MIT",
   "engines": {
@@ -96,14 +101,15 @@
     "sumneko.lua"
   ],
   "files": [
-    "dist",
+    "dist/**",
     "README.md",
     "lua-addons/**/*",
-    "syntaxes/**/*"
+    "dutchie2.png",
+    "LICENSE"
   ],
   "dependencies": {},
   "scripts": {
-    "vscode:prepublish": "npm run build -w compiler && npm run package",
+    "vscode:prepublish": "npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
