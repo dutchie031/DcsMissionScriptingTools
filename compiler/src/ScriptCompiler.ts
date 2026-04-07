@@ -64,9 +64,7 @@ export class ScriptCompiler {
         const readStart = Date.now();
         for (const entry of entries) {
             if (entry.isFile() && entry.name.endsWith('.lua')) {
-                
-
-                const fullPath = path.join(entry.parentPath ?? entry.path, entry.name);
+                const fullPath = path.join(entry.parentPath, entry.name);
                 const relativePath = path.relative(this.options.sourcePath, fullPath);
                 const content = fs.readFileSync(fullPath, 'utf-8');
                 
@@ -90,7 +88,7 @@ export class ScriptCompiler {
         const writeEnd = Date.now();
         metricsMeter.writeTimeMs = (writeEnd - writeStart);
 
-        writer.logDependencyTree();
+        // writer.logDependencyTree();
         this.logger.info(`Compilation complete. Output written to ${path.join(this.options.outputPath, this.options.outputFileName!)}`);
         const end = Date.now();
 
@@ -370,16 +368,19 @@ class Writer {
         const depth : number = 1;
         this.logger.writeLine('Dependency Tree <root>:');
         const logFileRecursive = (parsedFile: ParsedFile, currentDepth: number) => {
-            if (visited.has(parsedFile.fileKey)) {
+            if(currentDepth === 0 && visited.has(parsedFile.fileKey)) {
                 return;
             }
+
             visited.add(parsedFile.fileKey);
-            let padding = '  '.repeat(currentDepth);
+            let padding = '  '.repeat(currentDepth * 2);
             if (currentDepth > 0) {
-                padding = '  '.repeat(currentDepth) + '└─>';
+                padding += '└─>';
             }
+            
             const printable = parsedFile.fileKey.replace(LUA_SCRIPT_GLOBAL_KEYWORD + '.', '');
-            this.logger.writeLine(padding + printable);
+            const lastPart = printable.split('.').pop();
+            this.logger.writeLine(`${padding} ${lastPart} ${' '.repeat(Math.max(0, 64 - padding.length - (lastPart ? lastPart.length : 0)))} ${printable}`);
             for (const dep of parsedFile.dependencies) {
                 const depFile = this.files.get(dep.fileKey);
                 if (depFile) {
