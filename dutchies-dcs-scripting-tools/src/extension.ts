@@ -26,9 +26,9 @@ export function activate(context: vscode.ExtensionContext) {
 	pluginPath = context.asAbsolutePath('lua-addons');
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.enable', () => {
+        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.enable', async () => {
             addPluginPathToSettings();
-            vscode.commands.executeCommand(
+            await vscode.commands.executeCommand(
                 "lua.startServer"
             );
             vscode.window.showInformationMessage('Dutchies DCS Scripting Tools enabled.');
@@ -36,9 +36,9 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.disable', () => {
+        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.disable', async () => {
             removePluginPathFromSettings();
-            vscode.commands.executeCommand(
+            await vscode.commands.executeCommand(
                 "lua.startServer"
             );
             vscode.window.showInformationMessage('Dutchies DCS Scripting Tools disabled.');
@@ -46,8 +46,8 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.openSettings', () => {
-            vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${extensionSettingsFilter}`);
+        vscode.commands.registerCommand('dutchies-dcs-scripting-tools.openSettings', async () => {
+            await vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${extensionSettingsFilter}`);
     }));
 
     context.subscriptions.push(
@@ -70,6 +70,18 @@ export function activate(context: vscode.ExtensionContext) {
             const compileAt = config.get<string>('compileAt') || "undefined";
             if (compileAt === 'onSave') {
                 await compileLuaScripts();
+            }
+        }
+    });
+
+    vscode.workspace.onDidChangeConfiguration(async(event) => {
+        if (event.affectsConfiguration(`${extensionName}.dcsTypes`)) {
+            const config = vscode.workspace.getConfiguration(extensionName);
+            const dcsTypesEnabled = config.get<boolean>('dcsTypes') || false;
+            if (dcsTypesEnabled) {
+                addPluginPathToSettings();
+            } else {
+                removePluginPathFromSettings();
             }
         }
     });
@@ -146,6 +158,22 @@ async function compileLuaScripts() {
         });
         diagnosticCollection.set(uri, diagnostics);
     }
+}
+
+async function enableIntellisense() {
+    addPluginPathToSettings();
+    await vscode.commands.executeCommand(
+        "lua.startServer"
+    );
+    vscode.window.showInformationMessage('Dutchies DCS Scripting Tools enabled.');
+}
+
+async function disableIntellisense() {
+    removePluginPathFromSettings();
+    await vscode.commands.executeCommand(
+        "lua.startServer"
+    );
+    vscode.window.showInformationMessage('Dutchies DCS Scripting Tools disabled.');
 }
 
 function addPluginPathToSettings() {
