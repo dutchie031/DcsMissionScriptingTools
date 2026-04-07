@@ -65,6 +65,12 @@ return utils
 
 ## Release Notes
 
+### 0.0.2
+
+- Improved error handling and reporting in the script compiler.
+- Added Output channel for compilation logs and errors.
+- Improved Settings for better user experience.
+
 ### 0.0.1
 
 Initial. 

@@ -4,6 +4,8 @@ import * as path from 'path';
 export interface CompilationError {
     filePath: string;
     line: number;
+    charStart?: number;
+    charEnd?: number;
     message: string;
 }
 
@@ -15,49 +17,93 @@ export interface ScriptCompilerOptions {
     onError?: (error: CompilationError) => void
 }
 
+export interface ICompilationLogger {
+    info(message: string): void;
+    error(message: string): void;
+    writeLine(message: string): void;
+}
+
+class Metrics {
+    public totalLinesRead : number = 0;
+    public totalLinesWritten: number = 0;
+    public readTimeMs : number = 0;
+    public writeTimeMs : number = 0;
+    public totalTimeMs : number = 0;
+    public filesRead : number = 0;
+    public filesWritten : number = 0;
+
+    log(logger: ICompilationLogger){
+        logger.writeLine("Compilation Metrics: ")
+        logger.writeLine(`=====================`)
+        logger.writeLine(`Lines Read:       ${this.totalLinesRead}`)
+        logger.writeLine(`Lines Written:    ${this.totalLinesWritten}`)
+        logger.writeLine(`Files Processed:  ${this.filesRead} | ${this.filesWritten}`)
+        logger.writeLine(`=====================`)
+        logger.writeLine(`Read Time (ms):   ${this.readTimeMs} ms`)
+        logger.writeLine(`Write Time (ms):  ${this.writeTimeMs} ms`)
+        logger.writeLine(`Total Time (ms):  ${this.totalTimeMs} ms`)
+    }
+}
+
 const LUA_SCRIPT_GLOBAL_KEYWORD = 'ScriptGlobals';
 
 export class ScriptCompiler {
 
-    constructor(private options: ScriptCompilerOptions) {
+    constructor(private options: ScriptCompilerOptions, private logger: ICompilationLogger) {
         if (options.outputFileName === undefined) {
             this.options.outputFileName = 'compiled.lua';
         }
     }
 
-    public async compile(): Promise<void> {
+    public async compile(includeDevScript: boolean): Promise<void> {
+        const start = Date.now();
+        const metricsMeter = new Metrics();
         const entries = fs.readdirSync(this.options.sourcePath, { recursive: true, withFileTypes: true });
         const parsedFiles: Map<string, ParsedFile> = new Map();
 
+        const readStart = Date.now();
         for (const entry of entries) {
             if (entry.isFile() && entry.name.endsWith('.lua')) {
-                const fullPath = path.join(entry.parentPath ?? entry.path, entry.name);
+                const fullPath = path.join(entry.parentPath, entry.name);
                 const relativePath = path.relative(this.options.sourcePath, fullPath);
                 const content = fs.readFileSync(fullPath, 'utf-8');
                 
-                const parsedFile = this.parseFile(relativePath, content, fullPath);
+                const parsedFile = this.parseFile(relativePath, content, fullPath, metricsMeter);
                 parsedFiles.set(parsedFile.fileKey, parsedFile);
+                metricsMeter.filesRead++;
             }
         }
+        const readEnd = Date.now();
+        metricsMeter.readTimeMs = readEnd - readStart;
 
         const writer = new Writer(
             path.join(this.options.outputPath, this.options.outputFileName!),
             parsedFiles,
+            this.logger,
             this.options.onError
         );
+        
+        const writeStart = Date.now();
+        writer.write(includeDevScript, metricsMeter);
+        const writeEnd = Date.now();
+        metricsMeter.writeTimeMs = (writeEnd - writeStart);
 
-        writer.write();
-        console.log(`Compilation complete. Output written to ${path.join(this.options.outputPath, this.options.outputFileName!)}`);
+        // writer.logDependencyTree();
+        this.logger.info(`Compilation complete. Output written to ${path.join(this.options.outputPath, this.options.outputFileName!)}`);
+        const end = Date.now();
+
+        metricsMeter.totalTimeMs = (end-start);
+        metricsMeter.log(this.logger);
     }
 
-    private reportError(filePath: string, line: number, message: string): void {
+    private reportError(filePath: string, line: number, charStart: number | undefined, charEnd: number | undefined, message: string): void {
         if (this.options.onError) {
-            this.options.onError({ filePath, line, message });
+            this.options.onError({ filePath, line, charStart, charEnd, message });
         }
     }
 
-    private parseFile(filePath: string, content: string, fullPath: string): ParsedFile {
-        const dependencies: string[] = [];
+    private parseFile(filePath: string, content: string, fullPath: string, metricsMeter: Metrics): ParsedFile {
+        const dependencies: Dependency[] = [];
         const newLines: string[] = [`do --${filePath}`];
 
         content = stripLuaMultilineComments(content);
@@ -83,6 +129,7 @@ export class ScriptCompiler {
         };
 
         for (let i = 0; i < lines.length; i++) {
+            metricsMeter.totalLinesRead++;
             let line = lines[i];
             const trimmedLine = line.trim();
 
@@ -103,7 +150,7 @@ export class ScriptCompiler {
                     }
                     newLines.push(line);
                 } else {
-                    this.reportError(fullPath, i, `Code found after module-level return: ${trimmedLine}`);
+                    this.reportError(fullPath, i, undefined, undefined, `Code found after module-level return: ${trimmedLine}`);
                     newLines.push(line); // Continue processing despite error
                 }
                 continue;
@@ -112,8 +159,10 @@ export class ScriptCompiler {
             // Handle require statements
             const requireMatch = line.match(/require\(['"](.+?)['"]\)/);
             if (requireMatch) {
-                const requiredModule = fileReferenceToLuaVariable(requireMatch[1]);
-                dependencies.push(requiredModule);
+                const textMatch = requireMatch[1];
+                const requiredModule = fileReferenceToLuaVariable(textMatch);
+
+                dependencies.push(new Dependency(textMatch, i, requireMatch.index ?? 0, (requireMatch.index ?? 0) + requireMatch[0].length));
                 line = line.replace(requireMatch[0], requiredModule);
             }
 
@@ -164,7 +213,7 @@ export class ScriptCompiler {
                         const afterReturn = trimmedLine.substring(afterReturnPos).trim();
                         
                         if (afterReturn === '') {
-                            this.reportError(fullPath, i, 'Empty return statement at module level');
+                            this.reportError(fullPath, i, afterReturnPos, afterReturnPos, 'Empty return statement at module level');
                             continue;
                         }
 
@@ -207,7 +256,7 @@ export class ScriptCompiler {
                         }
                         
                         if (hasMultipleValues) {
-                            this.reportError(fullPath, i, `Multiple return values not supported: ${trimmedLine}`);
+                            this.reportError(fullPath, i, afterReturnPos, afterReturnPos + afterReturn.length, `Multiple return values not supported: ${trimmedLine}`);
                         } else {
                             // Replace return with assignment
                             const moduleVariable = fileReferenceToLuaVariable(filePath);
@@ -241,6 +290,20 @@ function stripLuaMultilineComments(content: string): string {
     return content.replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, '');
 }
 
+class Dependency {
+    public readonly fileKey: string;
+
+    constructor(
+        public readonly requiredModule: string,
+        public readonly requiredAtLine: number,
+        public readonly charStart: number,
+        public readonly charEnd: number
+    )
+    {
+        this.fileKey = fileReferenceToLuaVariable(requiredModule);
+    }
+}
+
 class ParsedFile {
     public readonly fileKey: string;
     
@@ -248,7 +311,7 @@ class ParsedFile {
         public readonly filePath: string,
         public readonly fullPath: string,
         public readonly lines: string[],
-        public readonly dependencies: string[]
+        public readonly dependencies: Dependency[]
     ) {
         this.fileKey = fileReferenceToLuaVariable(filePath);
     }
@@ -289,37 +352,55 @@ class Writer {
     constructor(
         public location: string,
         public files: Map<string, ParsedFile>,
+        private readonly logger: ICompilationLogger,
         public onError?: (error: CompilationError) => void
     ) {}
 
     private getStartLines(): string[] {
-        return [`local ${LUA_SCRIPT_GLOBAL_KEYWORD} = {}`];
+        return [
+            `-- Transpiled at (UTC): ${new Date().toISOString()}`,
+            `local ${LUA_SCRIPT_GLOBAL_KEYWORD} = {}`
+        ];
     }
     
-    write(): void {
+    logDependencyTree(): void {
+        const visited: Set<string> = new Set();
+        const depth : number = 1;
+        this.logger.writeLine('Dependency Tree <root>:');
+        const logFileRecursive = (parsedFile: ParsedFile, currentDepth: number) => {
+            if(currentDepth === 0 && visited.has(parsedFile.fileKey)) {
+                return;
+            }
+
+            visited.add(parsedFile.fileKey);
+            let padding = '  '.repeat(currentDepth * 2);
+            if (currentDepth > 0) {
+                padding += '└─>';
+            }
+            
+            const printable = parsedFile.fileKey.replace(LUA_SCRIPT_GLOBAL_KEYWORD + '.', '');
+            const lastPart = printable.split('.').pop();
+            this.logger.writeLine(`${padding} ${lastPart} ${' '.repeat(Math.max(0, 64 - padding.length - (lastPart ? lastPart.length : 0)))} ${printable}`);
+            for (const dep of parsedFile.dependencies) {
+                const depFile = this.files.get(dep.fileKey);
+                if (depFile) {
+                    logFileRecursive(depFile, currentDepth + 1);
+                }
+            }
+        }
+
+        for (const parsedFile of this.files.values()) {
+            logFileRecursive(parsedFile, depth);
+        }
+    };
+
+    write(includeDevScript: boolean, metrics: Metrics): void {
         const writtenFiles: Set<string> = new Set();
         const outputLines: string[] = [];
 
-        outputLines.push(...this.getStartLines());
-
-        const writeFileRecursive = (fileKey: string) => {
-            if (writtenFiles.has(fileKey)) {
-                return;
-            }
-            
-            const file = this.files.get(fileKey);
-            if (!file) {
-                throw new Error(`File not found in compiler: ${fileKey}`);
-            }
-
-            // Write dependencies first
-            for (const dep of file.dependencies) {
-                writeFileRecursive(dep);
-            }
-            
-            outputLines.push(...file.lines);
-            writtenFiles.add(fileKey);
-        };
+        const startLines = this.getStartLines();
+        metrics.totalLinesWritten+=startLines.length;
+        outputLines.push(...startLines);
 
         //Check for circular dependencies before writing
         const visited: Set<string> = new Set();
@@ -347,7 +428,7 @@ class Writer {
                 const file = this.files.get(key);
                 if (file) {
                     for (const dep of file.dependencies) {
-                        if (checkCircular(dep)) {
+                        if (checkCircular(dep.fileKey)) {
                             return true;
                         }
                     }
@@ -361,12 +442,55 @@ class Writer {
             }
         }   
 
+        const writeFileRecursive = (parsedFile: ParsedFile) => {
+            if (writtenFiles.has(parsedFile.fileKey)) {
+                return;
+            }
+
+            // Write dependencies first
+            for (const dep of parsedFile.dependencies) {
+                const depFile = this.files.get(dep.fileKey);
+                if (depFile) {
+                    writeFileRecursive(depFile);
+                } else {
+                    this.onError?.({
+                        filePath: parsedFile.fullPath,
+                        line: dep.requiredAtLine,
+                        charStart: dep.charStart,
+                        charEnd: dep.charEnd,
+                        message: `Missing dependency: ${dep.fileKey}`
+                    });
+                }
+            }
+            metrics.totalLinesWritten += parsedFile.lines.length;
+            outputLines.push(...parsedFile.lines);
+            writtenFiles.add(parsedFile.fileKey);
+            metrics.filesWritten++;
+        };
+
         // Write all files in dependency order
-        for (const fileKey of this.files.keys()) {
-            writeFileRecursive(fileKey);
+        for (const parsedFile of this.files.values()) {
+            writeFileRecursive(parsedFile);
         }
 
         fs.mkdirSync(path.dirname(this.location), { recursive: true });
         fs.writeFileSync(this.location, outputLines.join('\n'), 'utf-8');
+
+        if(includeDevScript) {
+            const devFileLocation = this.location.replace('.lua', '.dev.lua');
+            this.writeDevScript(devFileLocation, this.location);
+        }
+    }
+
+    private writeDevScript(devFileLocation: string, actualFileLocation: string){
+        const devLines = [
+            `-- DEV SCRIPT - NOT FOR PRODUCTION USE`,
+            `-- This script can be referenced in DCS. Compiled script will then be loaded dynamically.`,
+            `-- This way you can test the compiled output without having to re-import the script into the mission every time.`,
+            `-- This file will only have to be re-imported when the name or location of the compiled script file changes.`,
+            `assert(loadfile("${actualFileLocation}"))()`
+        ];
+        fs.writeFileSync(devFileLocation, devLines.join('\n'), 'utf-8');
+        this.logger.info(`Development script written to ${devFileLocation}`);
     }
 }
