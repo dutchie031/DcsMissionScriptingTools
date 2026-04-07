@@ -65,6 +65,10 @@ return utils
 
 ## Release Notes
 
+### 0.0.3
+
+- Fixed: Settings filter not correct when opening settings with the extension command.
+
 ### 0.0.2
 
 - Improved error handling and reporting in the script compiler.
