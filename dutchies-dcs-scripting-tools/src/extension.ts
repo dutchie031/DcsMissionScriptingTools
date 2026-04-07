@@ -39,7 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('dutchies-dcs-scripting-tools.openSettings', async () => {
-            await vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${extensionSettingsFilter}`);
+            await vscode.commands.executeCommand("workbench.action.openSettings", `${extensionSettingsFilter}`);
     }));
 
     context.subscriptions.push(
