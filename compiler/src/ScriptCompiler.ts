@@ -55,7 +55,7 @@ export class ScriptCompiler {
         }
     }
 
-    public async compile(): Promise<void> {
+    public async compile(includeDevScript: boolean): Promise<void> {
         const start = Date.now();
         const metricsMeter = new Metrics();
         const entries = fs.readdirSync(this.options.sourcePath, { recursive: true, withFileTypes: true });
@@ -84,7 +84,7 @@ export class ScriptCompiler {
         );
         
         const writeStart = Date.now();
-        writer.write(metricsMeter);
+        writer.write(includeDevScript, metricsMeter);
         const writeEnd = Date.now();
         metricsMeter.writeTimeMs = (writeEnd - writeStart);
 
@@ -394,7 +394,7 @@ class Writer {
         }
     };
 
-    write(metrics: Metrics): void {
+    write(includeDevScript: boolean, metrics: Metrics): void {
         const writtenFiles: Set<string> = new Set();
         const outputLines: string[] = [];
 
@@ -475,5 +475,22 @@ class Writer {
 
         fs.mkdirSync(path.dirname(this.location), { recursive: true });
         fs.writeFileSync(this.location, outputLines.join('\n'), 'utf-8');
+
+        if(includeDevScript) {
+            const devFileLocation = this.location.replace('.lua', '.dev.lua');
+            this.writeDevScript(devFileLocation, this.location);
+        }
+    }
+
+    private writeDevScript(devFileLocation: string, actualFileLocation: string){
+        const devLines = [
+            `-- DEV SCRIPT - NOT FOR PRODUCTION USE`,
+            `-- This script can be referenced in DCS. Compiled script will then be loaded dynamically.`,
+            `-- This way you can test the compiled output without having to re-import the script into the mission every time.`,
+            `-- This file will only have to be re-imported when the name or location of the compiled script file changes.`,
+            `assert(loadfile("${actualFileLocation}"))()`
+        ];
+        fs.writeFileSync(devFileLocation, devLines.join('\n'), 'utf-8');
+        this.logger.info(`Development script written to ${devFileLocation}`);
     }
 }

@@ -27,21 +27,13 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('dutchies-dcs-scripting-tools.enable', async () => {
-            addPluginPathToSettings();
-            await vscode.commands.executeCommand(
-                "lua.startServer"
-            );
-            vscode.window.showInformationMessage('Dutchies DCS Scripting Tools enabled.');
+            enableIntellisense();
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand('dutchies-dcs-scripting-tools.disable', async () => {
-            removePluginPathFromSettings();
-            await vscode.commands.executeCommand(
-                "lua.startServer"
-            );
-            vscode.window.showInformationMessage('Dutchies DCS Scripting Tools disabled.');
+            disableIntellisense();
         })
     );
 
@@ -116,11 +108,10 @@ async function compileLuaScripts() {
     logger.clear();
     logger.info("Compiling...");
 
-    const config = vscode.workspace.getConfiguration('dcsScriptingTools');
-    const sourcePath = config.get<string>('luaSourcePath') || '${workspaceFolder}/src';
+    const config = vscode.workspace.getConfiguration(extensionName);
+    const sourcePath = config.get<string>('luaSrcDirectory') || '${workspaceFolder}/src';
     const outputPath = config.get<string>('luaOutputPath') || '${workspaceFolder}/dist';
-    const minify = config.get<boolean>('minifyLuaScripts') || false;
-
+    
     const resolvedSourcePath = sourcePath.replace('${workspaceFolder}', vscode.workspace.workspaceFolders?.[0].uri.fsPath || '');
     const resolvedOutputPath = outputPath.replace('${workspaceFolder}', vscode.workspace.workspaceFolders?.[0].uri.fsPath || '');
     
@@ -130,7 +121,7 @@ async function compileLuaScripts() {
     const options: ScriptCompilerOptions = {
         sourcePath: resolvedSourcePath,
         outputPath: resolvedOutputPath,
-        minify: minify,
+        minify: false,
         onError: (error: CompilationError) => {
             const errors = errorsByFile.get(error.filePath) || [];
             errors.push(error);
@@ -140,8 +131,11 @@ async function compileLuaScripts() {
 
     const compilationLogger = new CompilationLogger(logger);
     const compiler = new ScriptCompiler(options, compilationLogger);
+
+    const includeDevScript = config.get<boolean>('includeDevelopmentScript') || false;
+
     try {
-        await compiler.compile();
+        await compiler.compile(includeDevScript);
     } catch (err) {
         vscode.window.showErrorMessage('Compilation failed: ' + (err as Error).message);
     }
@@ -161,6 +155,12 @@ async function compileLuaScripts() {
 }
 
 async function enableIntellisense() {
+
+    const config = vscode.workspace.getConfiguration(extensionName);
+    if (config.get<boolean>("dcsTypes") === false) {
+        config.update("dcsTypes", true, vscode.ConfigurationTarget.Workspace);
+    }
+
     addPluginPathToSettings();
     await vscode.commands.executeCommand(
         "lua.startServer"
@@ -169,6 +169,11 @@ async function enableIntellisense() {
 }
 
 async function disableIntellisense() {
+    const config = vscode.workspace.getConfiguration(extensionName);
+    if (config.get<boolean>("dcsTypes") === true) {
+        config.update("dcsTypes", false, vscode.ConfigurationTarget.Workspace);
+    }
+
     removePluginPathFromSettings();
     await vscode.commands.executeCommand(
         "lua.startServer"
