@@ -1,0 +1,30 @@
+name: 'Scripting Compiler Action'
+description: 'Runs the custom ScriptCompiler as a GitHub Action.'
+inputs:
+  source-root:
+    description: 'The root directory of the source files to compile.'
+    required: true
+    default: 'src'
+  output-file:
+    description: 'The path to the output file for the compiled script.'
+    required: true
+    default: 'output/compiled.lua'
+  
+runs:
+  using: 'composite'
+  steps:
+    - name: Build action
+      run: |
+        npm ci
+        npm run build
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      
+    - name: Run compiler
+      run: node ${{ github.action_path }}/dist/index.js
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        INPUT_SOURCE-ROOT: ${{ inputs.source-root }}
+        INPUT_OUTPUT-FILE: ${{ inputs.output-file }}
+    
